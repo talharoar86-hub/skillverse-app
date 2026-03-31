@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { profileService } from '../services/api';
 import { useAuth } from '../auth/AuthContext';
+import { API_BASE_URL } from '../config';
 import { getAvatarUrl } from '../utils/avatar';
 
 const EXPERIENCE_LEVELS = ['Beginner', 'Intermediate', 'Advanced / Expert'];
@@ -115,7 +116,7 @@ const EditProfileModal = ({ isOpen, onClose, onUpdate }) => {
       const fd = new FormData();
       fd.append('avatar', file);
       const res = await profileService.uploadAvatar(fd);
-      const fullUrl = `http://localhost:5000${res.avatarUrl}`;
+      const fullUrl = `${API_BASE_URL}${res.avatarUrl}`;
       setAvatarPreview(fullUrl);
       updateUser({ avatarUrl: res.avatarUrl });
     } catch {

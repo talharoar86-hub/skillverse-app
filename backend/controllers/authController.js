@@ -112,7 +112,7 @@ const forgotPassword = async (req, res) => {
     await user.save({ validateBeforeSave: false });
 
     // Mock sending email
-    const resetUrl = `http://localhost:5173/reset-password/${resetToken}`;
+    const resetUrl = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/reset-password/${resetToken}`;
     console.log(`\n\n--- FORGOT PASSWORD MOCK EMAIL ---`);
     console.log(`To: ${user.email}`);
     console.log(`Please go to this link to reset your password: \n${resetUrl}`);
@@ -163,7 +163,7 @@ const googleCallback = (req, res) => {
     sameSite: 'lax'
   };
 
-  const frontendRedirectUrl = `http://localhost:5173/oauth/callback?token=${accessToken}`;
+  const frontendRedirectUrl = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/oauth/callback?token=${accessToken}`;
   
   res.cookie('refreshToken', refreshToken, options)
      .redirect(frontendRedirectUrl);

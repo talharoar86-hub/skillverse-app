@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { LogIn, Github, Mail, Lock, Eye, EyeOff } from 'lucide-react';
 import { useAuth } from './AuthContext';
+import { API_BASE_URL } from '../config';
 
 const Login = () => {
   const navigate = useNavigate();
@@ -36,7 +37,7 @@ const Login = () => {
   const handleOAuth = async (provider) => {
     setLoading(true);
     if (provider === 'Google') {
-      window.location.href = 'http://localhost:5000/api/auth/google';
+      window.location.href = `${API_BASE_URL}/api/auth/google`;
     } else {
       setLoading(false);
     }

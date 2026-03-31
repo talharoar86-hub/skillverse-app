@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { User, Mail, Lock, Eye, EyeOff, Check, X as XIcon } from 'lucide-react';
 import { useAuth } from './AuthContext';
+import { API_BASE_URL } from '../config';
 
 const Signup = () => {
   const navigate = useNavigate();
@@ -68,7 +69,7 @@ const Signup = () => {
     setLoading(true);
     // Redirect to backend OAuth initiation route
     if (provider === 'Google') {
-      window.location.href = 'http://localhost:5000/api/auth/google';
+      window.location.href = `${API_BASE_URL}/api/auth/google`;
     } else {
       setLoading(false);
     }
