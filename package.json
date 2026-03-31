@@ -1,0 +1,20 @@
+{
+  "name": "skillverse-root",
+  "version": "1.0.0",
+  "description": "SkillVerse Fullstack Application",
+  "main": "backend/server.js",
+  "scripts": {
+    "start": "node backend/server.js",
+    "dev:backend": "node backend/server.js",
+    "dev:frontend": "cd frontend && npm run dev",
+    "build": "cd frontend && npm run build"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "mongodb": "^7.1.0"
+  },
+  "devDependencies": {
+    "gh-pages": "^6.3.0"
+  }
+}
