@@ -7,7 +7,7 @@
     "start": "node backend/server.js",
     "dev:backend": "node backend/server.js",
     "dev:frontend": "cd frontend && npm run dev",
-    "build": "cd frontend && npm run build"
+    "build": "cd frontend && npm install && npm run build"
   },
   "author": "",
   "license": "ISC",
