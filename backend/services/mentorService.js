@@ -1,5 +1,6 @@
 const User = require('../models/User');
 const MentorshipRequest = require('../models/MentorshipRequest');
+const Review = require('../models/Review');
 
 // Get students/mentees for a mentor
 async function getStudents(mentorId) {
@@ -23,11 +24,15 @@ async function getDashboardStats(mentorId) {
   const { Course } = require('../models/Learning');
   const totalCourses = await Course.countDocuments({ mentorId, status: 'published' });
    
-  // Get total sessions (this would come from a schedule/session model)
-  const totalSessions = 0; // Placeholder
+  // Get total sessions (from accepted mentorship requests)
+  const totalSessions = students;
    
-  // Get average rating (this would come from reviews)
-  const rating = 5.0; // Placeholder
+  // Calculate real average rating from reviews
+  const ratingResult = await Review.aggregate([
+    { $match: { mentorId } },
+    { $group: { _id: null, avgRating: { $avg: '$rating' } } }
+  ]);
+  const rating = ratingResult[0]?.avgRating ? Math.round(ratingResult[0].avgRating * 10) / 10 : 5.0;
    
   return {
     pendingRequests: requests,

@@ -18,3 +18,17 @@ export const getImageUrl = (path) => {
   if (path.startsWith('http')) return path;
   return `${API_BASE_URL}${path}`;
 };
+
+export const getCoverImageUrl = (user) => {
+  const coverUrl = user?.mentorProfile?.coverImageUrl;
+  if (!coverUrl) return '';
+  if (coverUrl.startsWith('http')) return coverUrl;
+  return `${API_BASE_URL}${coverUrl}`;
+};
+
+export const getVideoIntroUrl = (user) => {
+  const videoUrl = user?.mentorProfile?.videoIntroUrl;
+  if (!videoUrl) return '';
+  if (videoUrl.startsWith('http')) return videoUrl;
+  return `${API_BASE_URL}${videoUrl}`;
+};

@@ -28,7 +28,10 @@ exports.getConversations = async (req, res) => {
         });
 
         return {
-          ...conv,
+          _id: conv._id.toString(),
+          conversationId: conv._id.toString(),
+          participants: conv.participants,
+          lastMessage: conv.lastMessage,
           otherUser,
           unreadCount
         };
@@ -45,7 +48,22 @@ exports.getConversations = async (req, res) => {
 exports.getOrCreateConversation = async (req, res) => {
   try {
     const userId = req.user.id;
-    const { userId: otherUserId } = req.body;
+    let { userId: otherUserId } = req.body;
+
+    // Handle both formats: userId or user_id in body
+    if (!otherUserId && req.body.user_id) {
+      otherUserId = req.body.user_id;
+    }
+
+    if (!otherUserId) {
+      return res.status(400).json({ message: 'User ID is required' });
+    }
+
+    // Validate ObjectId format
+    const mongoose = require('mongoose');
+    if (!mongoose.Types.ObjectId.isValid(otherUserId)) {
+      return res.status(400).json({ message: 'Invalid user ID format' });
+    }
 
     if (userId === otherUserId) {
       return res.status(400).json({ message: 'Cannot create conversation with yourself' });
@@ -77,18 +95,31 @@ exports.getOrCreateConversation = async (req, res) => {
     });
 
     res.json({
-      ...conversation.toObject(),
+      _id: conversation._id.toString(),
+      conversationId: conversation._id.toString(),
+      participants: conversation.participants,
+      lastMessage: conversation.lastMessage,
       otherUser,
       unreadCount
     });
   } catch (err) {
     if (err.code === 11000) {
-      // Race condition - conversation was created by another request
+      const otherUserId = req.body.userId || req.body.user_id;
       const conversation = await Conversation.findOne({
-        participants: { $all: [req.user.id, req.body.userId], $size: 2 }
+        participants: { $all: [req.user.id, otherUserId], $size: 2 }
       });
-      return res.json(conversation);
+      if (conversation) {
+        return res.json({
+          _id: conversation._id.toString(),
+          conversationId: conversation._id.toString(),
+          participants: conversation.participants,
+          lastMessage: conversation.lastMessage,
+          otherUser: null,
+          unreadCount: 0
+        });
+      }
     }
+    console.error('Create conversation error:', err);
     res.status(500).json({ message: err.message });
   }
 };
@@ -143,7 +174,11 @@ exports.getMessages = async (req, res) => {
       .select('name avatarUrl experienceLevel goal isOnline');
 
     res.json({
-      messages,
+      messages: messages.map(m => ({
+        ...m,
+        _id: m._id.toString(),
+        sender: typeof m.sender === 'object' ? { ...m.sender, _id: m.sender._id?.toString() } : m.sender
+      })),
       hasMore,
       nextCursor: hasMore ? messages[0]?.createdAt : null,
       otherUser
@@ -243,7 +278,14 @@ exports.sendMessage = async (req, res) => {
       });
     }
 
-    res.status(201).json(message);
+    res.status(201).json({
+      ...message.toObject(),
+      _id: message._id.toString(),
+      sender: {
+        ...message.sender.toObject(),
+        _id: message.sender._id.toString()
+      }
+    });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }

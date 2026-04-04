@@ -2,9 +2,28 @@ const Notification = require('../models/Notification');
 
 exports.getNotifications = async (req, res) => {
   try {
-    const notifications = await Notification.find({ recipient: req.user.id })
-      .sort({ createdAt: -1 })
-      .limit(50);
+    const { page = 1, limit = 50, type, unread } = req.query;
+    const query = { recipient: req.user.id };
+
+    if (type && type !== 'all') {
+      query.type = type;
+    }
+    if (unread === 'true') {
+      query.isRead = false;
+    }
+
+    const pageNum = Math.max(1, parseInt(page));
+    const limitNum = Math.min(100, Math.max(1, parseInt(limit)));
+    const skip = (pageNum - 1) * limitNum;
+
+    const [notifications, total] = await Promise.all([
+      Notification.find(query)
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limitNum),
+      Notification.countDocuments(query)
+    ]);
+
     res.json(notifications);
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -13,10 +32,10 @@ exports.getNotifications = async (req, res) => {
 
 exports.getUnreadCount = async (req, res) => {
   try {
-    const count = await Notification.countDocuments({ 
-      recipient: req.user.id, 
-      isRead: false 
-    });
+    const { type } = req.query;
+    const filter = { recipient: req.user.id, isRead: false };
+    if (type) filter.type = type;
+    const count = await Notification.countDocuments(filter);
     res.json({ count });
   } catch (err) {
     res.status(500).json({ message: err.message });

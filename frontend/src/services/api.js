@@ -9,8 +9,13 @@ import api from './axiosClient';
 // --- Post Services ---
 
 export const postService = {
-  async getAllPosts(page = 1) {
-    const { data } = await api.get('/posts', { params: { page } });
+  async getAllPosts(page = 1, params = {}) {
+    const { data } = await api.get('/posts', { params: { page, ...params } });
+    return data;
+  },
+
+  async getPostsByFilter(filters = {}) {
+    const { data } = await api.get('/posts', { params: filters });
     return data;
   },
 
@@ -109,6 +114,11 @@ export const postService = {
   async getProfileStats() {
     const { data } = await api.get('/posts/profile-stats');
     return data;
+  },
+
+  async votePoll(postId, optionIndexes, remove = false) {
+    const { data } = await api.put(`/posts/${postId}/vote`, { optionIndexes, remove });
+    return data;
   }
 };
 
@@ -177,8 +187,25 @@ export const profileService = {
 // --- Course Services ---
 
 export const courseService = {
-  async getCourses() {
-    const { data } = await api.get('/courses');
+  async getCourses(type) {
+    const params = type && type !== 'all' ? { type } : {};
+    const { data } = await api.get('/courses', { params });
+    // Handle both paginated and array responses
+    return Array.isArray(data) ? data : (data.courses || []);
+  },
+
+  async getCoursesPaginated(params) {
+    const { data } = await api.get('/courses', { params });
+    return data; // Returns { courses, total, page, totalPages, hasMore }
+  },
+
+  async getCategories() {
+    const { data } = await api.get('/courses/categories');
+    return data;
+  },
+
+  async getSearchSuggestions(query) {
+    const { data } = await api.get('/courses/search/suggestions', { params: { q: query } });
     return data;
   },
 
@@ -189,6 +216,11 @@ export const courseService = {
 
   async getMentor(mentorId) {
     const { data } = await api.get(`/courses/mentor/${mentorId}`);
+    return data;
+  },
+
+  async getCourseById(courseId) {
+    const { data } = await api.get(`/courses/${courseId}`);
     return data;
   },
 
@@ -232,8 +264,32 @@ export const courseService = {
     return data;
   },
 
-  async updateProgress(courseId, lessonIndex) {
-    const { data } = await api.put(`/courses/${courseId}/progress`, { lessonIndex });
+  async uploadThumbnail(formData) {
+    const { data } = await api.post('/courses/upload-thumbnail', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    });
+    return data;
+  },
+
+  async uploadLessonVideo(formData) {
+    const { data } = await api.post('/courses/upload-lesson-video', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    });
+    return data;
+  },
+
+  async deleteLessonVideo(publicId) {
+    const { data } = await api.delete('/courses/delete-lesson-video', { data: { publicId } });
+    return data;
+  },
+
+  async duplicateCourse(courseId) {
+    const { data } = await api.post(`/courses/${courseId}/duplicate`);
+    return data;
+  },
+
+  async reorderLessons(courseId, lessonOrder) {
+    const { data } = await api.put(`/courses/${courseId}/lessons/reorder`, { lessonOrder });
     return data;
   }
 };
@@ -300,6 +356,11 @@ export const messageService = {
     return data;
   },
 
+  async getMentorFilteredConversations(type = 'all') {
+    const { data } = await api.get('/messages/conversations/mentor-filtered', { params: { type } });
+    return data;
+  },
+
   async createConversation(userId) {
     const { data } = await api.post('/messages/conversations', { userId });
     return data;
@@ -330,13 +391,13 @@ export const messageService = {
 // --- Notification Services ---
 
 export const notificationService = {
-  async getNotifications() {
-    const { data } = await api.get('/notifications');
+  async getNotifications(params = {}) {
+    const { data } = await api.get('/notifications', { params });
     return data;
   },
 
-  async getUnreadCount() {
-    const { data } = await api.get('/notifications/unread-count');
+  async getUnreadCount(type) {
+    const { data } = await api.get('/notifications/unread-count', { params: type ? { type } : {} });
     return data;
   },
 
@@ -384,6 +445,11 @@ export const mentorService = {
     return data;
   },
 
+  async getPublicStats(mentorId) {
+    const { data } = await api.get(`/mentor/public-stats/${mentorId}`);
+    return data;
+  },
+
   async getStudents() {
     const { data } = await api.get('/mentor/dashboard/students');
     return data;
@@ -391,6 +457,73 @@ export const mentorService = {
 
   async getUpcomingSessions() {
     const { data } = await api.get('/mentor/dashboard/upcoming-sessions');
+    return data;
+  },
+
+  async getAnalytics(period = '30d') {
+    const { data } = await api.get('/mentor/dashboard/analytics', { params: { period } });
+    return data;
+  },
+
+  async getEarnings(params = {}) {
+    const { data } = await api.get('/mentor/earnings', { params });
+    return data;
+  },
+
+  async getCourseReviews(params = {}) {
+    const { data } = await api.get('/mentor/course-reviews', { params });
+    return data;
+  },
+
+  async replyToReview(reviewId, text) {
+    const { data } = await api.post(`/mentor/course-reviews/${reviewId}/reply`, { text });
+    return data;
+  },
+
+  async getSettings() {
+    const { data } = await api.get('/mentor/settings');
+    return data;
+  },
+
+  async updateSettings(settings) {
+    const { data } = await api.put('/mentor/settings', settings);
+    return data;
+  },
+
+  async uploadProfileImage(formData) {
+    const { data } = await api.post('/user/avatar', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    });
+    return data;
+  },
+
+  async uploadCoverImage(formData) {
+    const { data } = await api.post('/mentor/upload-cover', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    });
+    return data;
+  },
+
+  async uploadVideoIntro(formData, onProgress) {
+    const { data } = await api.post('/mentor/upload-video', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+      onUploadProgress: (progressEvent) => {
+        if (onProgress) {
+          const percent = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+          onProgress(percent);
+        }
+      }
+    });
+    return data;
+  },
+
+  async deleteVideoIntro() {
+    const { data } = await api.delete('/mentor/video-intro');
+    return data;
+  },
+
+  async getProfileViews(period = '30d') {
+    const { data } = await api.get('/mentor/profile-views', { params: { period } });
     return data;
   }
 };
@@ -456,8 +589,8 @@ export const scheduleService = {
     const { data } = await api.get(`/schedule/${mentorId}`);
     return data;
   },
-  async updateSchedule(schedules, timezone) {
-    const { data } = await api.put('/schedule', { schedules, timezone });
+  async updateSchedule(schedules, timezone, blockedDates, templates, calendarSync) {
+    const { data } = await api.put('/schedule', { schedules, timezone, blockedDates, templates, calendarSync });
     return data;
   },
   async bookSlot(bookingData) {
@@ -466,6 +599,42 @@ export const scheduleService = {
   },
   async cancelBooking(slotId) {
     const { data } = await api.put(`/schedule/${slotId}/cancel`);
+    return data;
+  },
+  async blockDates(mentorId, blockedDates) {
+    const { data } = await api.put(`/schedule/${mentorId}/block-dates`, { blockedDates });
+    return data;
+  },
+  async saveTemplate(mentorId, template) {
+    const { data } = await api.post(`/schedule/${mentorId}/template`, template);
+    return data;
+  },
+  async getTemplates(mentorId) {
+    const { data } = await api.get(`/schedule/${mentorId}/templates`);
+    return data;
+  },
+  async deleteTemplate(mentorId, templateId) {
+    const { data } = await api.delete(`/schedule/${mentorId}/template/${templateId}`);
+    return data;
+  },
+  async applyTemplate(mentorId, templateId, days) {
+    const { data } = await api.post(`/schedule/${mentorId}/apply-template`, { templateId, days });
+    return data;
+  },
+  async copyDaySlots(mentorId, fromDay, toDays) {
+    const { data } = await api.post(`/schedule/${mentorId}/copy-slots`, { fromDay, toDays });
+    return data;
+  },
+  async connectCalendar(mentorId, provider, accessToken, refreshToken) {
+    const { data } = await api.post(`/schedule/${mentorId}/connect-calendar`, { provider, accessToken, refreshToken });
+    return data;
+  },
+  async disconnectCalendar(mentorId, provider) {
+    const { data } = await api.delete(`/schedule/${mentorId}/disconnect-calendar`, { params: { provider } });
+    return data;
+  },
+  async syncCalendar(mentorId) {
+    const { data } = await api.post(`/schedule/${mentorId}/sync-calendar`);
     return data;
   }
 };
@@ -483,6 +652,10 @@ export const reviewService = {
   },
   async getStats(mentorId) {
     const { data } = await api.get(`/reviews/stats/${mentorId}`);
+    return data;
+  },
+  async replyToReview(reviewId, text) {
+    const { data } = await api.post(`/reviews/${reviewId}/reply`, { text });
     return data;
   }
 };
@@ -541,6 +714,188 @@ export const feedService = {
   }
 };
 
+// --- Search Services ---
+
+export const searchService = {
+  async search(query, type = 'all', page = 1) {
+    let useFallback = false;
+    
+    try {
+      await api.get('/search', { params: { q: query, type, page } });
+    } catch (err) {
+      if (err.response?.status === 404) {
+        console.log('Search endpoint not found, using fallback');
+        useFallback = true;
+      }
+    }
+    
+    if (useFallback) {
+      try {
+        const [usersRes, postsRes, coursesRes, categoriesRes] = await Promise.allSettled([
+          profileService.getAllUsers(page, 20),
+          postService.getAllPosts(page),
+          courseService.getCourses(),
+          courseService.getCategories(),
+        ]);
+        
+        let users = [], posts = [], courses = [], categories = [];
+        
+        if (usersRes.status === 'fulfilled') {
+          const val = usersRes.value;
+          users = Array.isArray(val) ? val : (val.users || []);
+        }
+        
+        if (postsRes.status === 'fulfilled') {
+          posts = Array.isArray(postsRes.value) ? postsRes.value : [];
+        }
+        
+        const isCourse = (item) => {
+          if (!item || !item._id) return false;
+          if (item._id.toString().includes('lesson')) return false;
+          if (item.thumbnail) return true;
+          if (item.description && !item.videoUrl) return true;
+          if (item.duration && item.content && !item.order) return true;
+          if (item.videoUrl && item.order) return false;
+          return true;
+        };
+        
+        if (coursesRes.status === 'fulfilled') {
+          const val = coursesRes.value;
+          if (Array.isArray(val)) {
+            courses = val.filter(isCourse);
+          } else if (val && val.courses && Array.isArray(val.courses)) {
+            courses = val.courses.filter(isCourse);
+          }
+        }
+        
+        if (categoriesRes.status === 'fulfilled') {
+          const val = categoriesRes.value;
+          categories = Array.isArray(val) ? val : (val.categories || []);
+        }
+        
+        const qLower = query.toLowerCase();
+        
+        const filterAndSort = (items, searchFields) => {
+          if (!Array.isArray(items)) return [];
+          const matched = items.filter(item => {
+            if (!item) return false;
+            return searchFields.some(field => {
+              const val = item[field];
+              return val && val.toString().toLowerCase().includes(qLower);
+            });
+          });
+          return matched.slice(0, 10);
+        };
+        
+        return {
+          users: filterAndSort(users, ['name', 'skills']),
+          posts: filterAndSort(posts, ['content', 'tags']),
+          courses: filterAndSort(courses, ['title', 'category']),
+          categories: filterAndSort(categories, ['name'])
+        };
+      } catch (fallbackErr) {
+        console.log('Fallback search failed:', fallbackErr);
+        return { users: [], posts: [], courses: [], categories: [] };
+      }
+    }
+    
+    return { users: [], posts: [], courses: [], categories: [] };
+  },
+
+  async getSuggestions(query) {
+    if (!query || query.length < 2) return [];
+    
+    try {
+      await api.get('/search/suggestions', { params: { q: query } });
+    } catch {
+      console.log('Suggestions endpoint not found, using fallback');
+    }
+    
+    try {
+      const [usersRes, coursesRes, categoriesRes] = await Promise.allSettled([
+        profileService.getAllUsers(1, 50),
+        courseService.getCourses(),
+        courseService.getCategories(),
+      ]);
+      
+      const suggestions = new Set();
+      const qLower = query.toLowerCase();
+      
+      let users = [], courses = [], categories = [];
+      
+      if (usersRes.status === 'fulfilled') {
+        const val = usersRes.value;
+        users = Array.isArray(val) ? val : (val.users || []);
+      }
+      
+      const isCourse = (item) => {
+        if (!item || !item._id) return false;
+        if (item._id.toString().includes('lesson')) return false;
+        if (item.thumbnail) return true;
+        if (item.description && !item.videoUrl) return true;
+        if (item.duration && item.content && !item.order) return true;
+        if (item.videoUrl && item.order) return false;
+        return true;
+      };
+      
+      if (coursesRes.status === 'fulfilled') {
+        const val = coursesRes.value;
+        if (Array.isArray(val)) {
+          courses = val.filter(isCourse);
+        } else if (val && val.courses && Array.isArray(val.courses)) {
+          courses = val.courses.filter(isCourse);
+        }
+      }
+      
+      if (categoriesRes.status === 'fulfilled') {
+        const val = categoriesRes.value;
+        categories = Array.isArray(val) ? val : (val.categories || []);
+      }
+      
+      const addIfMatch = (text) => {
+        if (text && text.toLowerCase().includes(qLower)) {
+          suggestions.add(text);
+        }
+      };
+      
+      users.forEach(u => {
+        addIfMatch(u.name);
+        u.skills?.forEach(addIfMatch);
+      });
+      
+      courses.forEach(c => {
+        addIfMatch(c.title);
+        addIfMatch(c.category);
+      });
+      
+      categories.forEach(c => {
+        addIfMatch(c.name);
+      });
+      
+      return Array.from(suggestions).slice(0, 4);
+    } catch {
+      return [];
+    }
+  },
+
+  async getRecentSearches() {
+    return [];
+  },
+
+  async clearRecentSearches() {
+    return { success: true };
+  },
+
+  async saveSearch(query) {
+    return { success: true };
+  },
+
+async getUserPosts(userId, page = 1) {
+    const { data } = await api.get(`/posts/user/${userId}`, { params: { page } });
+    return data;
+  }
+};
+
 // --- Enrollment Services ---
 
 export const enrollmentService = {
@@ -548,16 +903,83 @@ export const enrollmentService = {
     const { data } = await api.post(`/enrollment/${courseId}`);
     return data;
   },
-  async getMyCourses() {
-    const { data } = await api.get('/enrollment/my-courses');
-    return data;
+  async getMyCourses(filter) {
+    const params = filter && filter !== 'all' ? { filter } : {};
+    const { data } = await api.get('/enrollment/my-courses', { params });
+    // Handle both paginated and array responses
+    return Array.isArray(data) ? data : (data.enrollments || []);
+  },
+  async getMyCoursesPaginated(params) {
+    const { data } = await api.get('/enrollment/my-courses', { params });
+    return data; // Returns { enrollments, total, page, totalPages, hasMore }
   },
   async updateProgress(enrollmentId, lessonIndex) {
     const { data } = await api.put(`/enrollment/${enrollmentId}/progress`, { lessonIndex });
     return data;
   },
+  async toggleBookmark(enrollmentId, lessonIndex) {
+    const { data } = await api.put(`/enrollment/${enrollmentId}/bookmark`, { lessonIndex });
+    return data;
+  },
+  async updateAccess(enrollmentId, lessonIndex) {
+    const { data } = await api.put(`/enrollment/${enrollmentId}/access`, { lessonIndex });
+    return data;
+  },
   async getStats() {
     const { data } = await api.get('/enrollment/stats');
+    return data;
+  },
+  async getEnrollmentByCourse(courseId) {
+    const { data } = await api.get(`/enrollment/course/${courseId}`);
+    return data;
+  },
+  async updateTime(enrollmentId, seconds) {
+    const { data } = await api.put(`/enrollment/${enrollmentId}/time`, { seconds });
+    return data;
+  },
+  async getActivity(month, year) {
+    const { data } = await api.get('/enrollment/activity', { params: { month, year } });
+    return data;
+  },
+  async getWishlist() {
+    const { data } = await api.get('/wishlist');
+    return data;
+  },
+  async addToWishlist(courseId) {
+    const { data } = await api.post(`/wishlist/${courseId}`);
+    return data;
+  },
+  async removeFromWishlist(courseId) {
+    const { data } = await api.delete(`/wishlist/${courseId}`);
+    return data;
+  }
+};
+
+// --- Course Review Services ---
+
+export const courseReviewService = {
+  async submitReview(courseId, reviewData) {
+    const { data } = await api.post(`/course-reviews/${courseId}`, reviewData);
+    return data;
+  },
+  async getReviews(courseId, params = {}) {
+    const { data } = await api.get(`/course-reviews/${courseId}`, { params });
+    return data; // Returns { reviews, total, page, pages, userHasReviewed }
+  },
+  async updateReview(reviewId, updates) {
+    const { data } = await api.put(`/course-reviews/${reviewId}`, updates);
+    return data;
+  },
+  async deleteReview(reviewId) {
+    const { data } = await api.delete(`/course-reviews/${reviewId}`);
+    return data;
+  },
+  async replyToReview(reviewId, text) {
+    const { data } = await api.post(`/mentor/course-reviews/${reviewId}/reply`, { text });
+    return data;
+  },
+  async getMentorCourseReviews(params = {}) {
+    const { data } = await api.get('/mentor/course-reviews', { params });
     return data;
   }
 };

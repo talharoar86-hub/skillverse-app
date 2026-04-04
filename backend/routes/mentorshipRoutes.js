@@ -4,8 +4,10 @@ const MentorshipRequest = require('../models/MentorshipRequest');
 const User = require('../models/User');
 const Follow = require('../models/Follow');
 const Conversation = require('../models/Conversation');
+const Earning = require('../models/Earning');
 const { protect } = require('../middleware/auth');
 const { createNotification } = require('../controllers/notificationController');
+const { updateWalletOnEarning } = require('../services/walletService');
 
 // @desc    Send a mentorship request
 // @route   POST /api/mentorship/request
@@ -94,6 +96,26 @@ router.put('/:requestId/accept', protect, async (req, res) => {
     await User.findByIdAndUpdate(request.mentorId, {
       $inc: { 'mentorProfile.totalStudents': 1 }
     });
+
+    // Create earning for mentor's mentorship session
+    const mentorUser = await User.findById(request.mentorId);
+    if (mentorUser?.mentorProfile?.pricing > 0) {
+      const menteeUser = await User.findById(request.menteeId);
+      const earning = await Earning.create({
+        mentor: request.mentorId,
+        amount: mentorUser.mentorProfile.pricing,
+        source: 'mentorship',
+        reference: request._id,
+        referenceType: 'MentorshipRequest',
+        studentName: menteeUser?.name || 'Mentee',
+        studentId: request.menteeId,
+        courseTitle: request.skill,
+        currency: 'USD',
+        status: 'available'
+      });
+      
+      await updateWalletOnEarning(earning);
+    }
 
     const io = req.app.get('io');
     await createNotification(io, {
@@ -190,46 +212,102 @@ router.get('/stats', protect, async (req, res) => {
   }
 });
 
-// @desc    Get all mentors for discovery
+// @desc    Get all mentors for discovery (paginated, searchable)
 // @route   GET /api/mentorship/mentors
 router.get('/mentors', protect, async (req, res) => {
   try {
-    const { limit = 20 } = req.query;
+    const { page = 1, limit = 20, search, skill, sort = 'rating', minRating } = req.query;
 
-    const mentors = await User.find({
+    const query = {
       mentorStatus: 'approved',
       onboardingComplete: true,
       _id: { $ne: req.user._id }
-    })
-      .select('name avatarUrl skills experienceLevel bio mentorProfile')
-      .sort({ 'mentorProfile.rating': -1 })
-      .limit(parseInt(limit));
+    };
 
-    const result = await Promise.all(
-      mentors.map(async (mentor) => {
-        const [followersCount, menteesCount] = await Promise.all([
-          Follow.countDocuments({ following: mentor._id, status: 'accepted' }),
-          MentorshipRequest.countDocuments({ mentorId: mentor._id, status: 'accepted' })
-        ]);
+    if (search) {
+      query.$or = [
+        { name: { $regex: search, $options: 'i' } },
+        { 'mentorProfile.skills.name': { $regex: search, $options: 'i' } },
+        { 'mentorProfile.headline': { $regex: search, $options: 'i' } }
+      ];
+    }
 
-        return {
-          _id: mentor._id,
-          name: mentor.name,
-          avatarUrl: mentor.avatarUrl,
-          skills: mentor.mentorProfile?.skills?.length > 0
-            ? mentor.mentorProfile.skills.map(s => s.name)
-            : mentor.skills,
-          experienceLevel: mentor.experienceLevel,
-          bio: mentor.mentorProfile?.bio || mentor.bio,
-          rating: mentor.mentorProfile?.rating || 5.0,
-          followersCount,
-          menteesCount,
-          sessions: menteesCount
-        };
-      })
-    );
+    if (skill) {
+      query['mentorProfile.skills.name'] = { $regex: skill, $options: 'i' };
+    }
 
-    res.json(result);
+    if (minRating) {
+      query['mentorProfile.rating'] = { $gte: parseFloat(minRating) };
+    }
+
+    const sortOptions = {
+      rating: { 'mentorProfile.rating': -1 },
+      experience: { 'mentorProfile.experience': -1 },
+      students: { 'mentorProfile.totalStudents': -1 },
+      price_low: { 'mentorProfile.pricing': 1 },
+      price_high: { 'mentorProfile.pricing': -1 }
+    };
+
+    const skip = (Math.max(1, parseInt(page)) - 1) * parseInt(limit);
+
+    const [mentors, total] = await Promise.all([
+      User.find(query)
+        .select('name avatarUrl skills experienceLevel bio mentorProfile isOnline')
+        .sort(sortOptions[sort] || sortOptions.rating)
+        .skip(skip)
+        .limit(parseInt(limit)),
+      User.countDocuments(query)
+    ]);
+
+    const mentorIds = mentors.map(m => m._id);
+
+    // Batch-fetch counts and current user's relationship statuses
+    const [followersCounts, menteesCounts, userFollows, userMentorships] = await Promise.all([
+      Follow.aggregate([
+        { $match: { following: { $in: mentorIds }, status: 'accepted' } },
+        { $group: { _id: '$following', count: { $sum: 1 } } }
+      ]),
+      MentorshipRequest.aggregate([
+        { $match: { mentorId: { $in: mentorIds }, status: 'accepted' } },
+        { $group: { _id: '$mentorId', count: { $sum: 1 } } }
+      ]),
+      Follow.find({ follower: req.user._id, following: { $in: mentorIds } }).select('following status'),
+      MentorshipRequest.find({ menteeId: req.user._id, mentorId: { $in: mentorIds } }).select('mentorId status')
+    ]);
+
+    const followersMap = Object.fromEntries(followersCounts.map(f => [f._id.toString(), f.count]));
+    const menteesMap = Object.fromEntries(menteesCounts.map(m => [m._id.toString(), m.count]));
+    const followMap = Object.fromEntries(userFollows.map(f => [f.following.toString(), f.status]));
+    const mentorshipMap = Object.fromEntries(userMentorships.map(m => [m.mentorId.toString(), m.status]));
+
+    const result = mentors.map((mentor) => {
+      const id = mentor._id.toString();
+      return {
+        _id: mentor._id,
+        name: mentor.name,
+        avatarUrl: mentor.avatarUrl,
+        coverImageUrl: mentor.mentorProfile?.coverImageUrl || null,
+        isOnline: mentor.isOnline,
+        skills: mentor.mentorProfile?.skills?.length > 0
+          ? mentor.mentorProfile.skills.map(s => s.name)
+          : mentor.skills,
+        experienceLevel: mentor.experienceLevel,
+        bio: mentor.mentorProfile?.bio || mentor.bio,
+        rating: mentor.mentorProfile?.rating || 5.0,
+        followersCount: followersMap[id] || 0,
+        menteesCount: menteesMap[id] || 0,
+        sessions: menteesMap[id] || 0,
+        followStatus: followMap[id] || 'none',
+        mentorshipStatus: mentorshipMap[id] || 'none'
+      };
+    });
+
+    res.json({
+      mentors: result,
+      total,
+      page: parseInt(page),
+      totalPages: Math.ceil(total / parseInt(limit))
+    });
   } catch (error) {
     console.error('Get Mentors Error:', error);
     res.status(500).json({ message: 'Error fetching mentors' });

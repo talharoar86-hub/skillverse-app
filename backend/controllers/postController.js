@@ -5,24 +5,42 @@ const notificationController = require('./notificationController');
 // @desc    Create new post
 // @route   POST /api/posts
 const createPost = async (req, res) => {
-  const { content, tags, skills, type, codeSnippet, imageUrl, imageUrls } = req.body;
+  const { content, tags, skills, type, codeSnippet, imageUrl, imageUrls, poll } = req.body;
 
   try {
+    let endsAt = null;
+    if (poll?.durationHours) {
+      endsAt = new Date(Date.now() + poll.durationHours * 60 * 60 * 1000);
+    }
+
+    const pollData = poll ? {
+      question: poll.question || '',
+      options: (poll.options || []).map(opt => ({
+        text: opt.text,
+        votes: [],
+        voteCount: 0
+      })),
+      isMultiple: poll.isMultiple || false,
+      endsAt,
+      totalVotes: 0,
+      votedUsers: []
+    } : undefined;
+
     const post = await Post.create({
       userId: req.user._id,
       authorName: req.user.name,
-      authorAvatar: req.user.name.charAt(0).toUpperCase(),
+      authorAvatar: req.user.avatarUrl || req.user.name.charAt(0).toUpperCase(),
       authorRole: req.user.goal === 'Mentor' ? 'Mentor' : req.user.goal === 'Exchange' ? 'Exchanger' : 'Learner',
       content,
       tags,
-      skills: skills || tags, // Use tags as skills if not provided
-      type,
+      skills: skills || tags,
+      type: poll ? 'Poll' : type,
       codeSnippet,
       imageUrl: imageUrl || (imageUrls && imageUrls.length > 0 ? imageUrls[0] : null),
-      imageUrls: imageUrls || (imageUrl ? [imageUrl] : [])
+      imageUrls: imageUrls || (imageUrl ? [imageUrl] : []),
+      poll: pollData
     });
 
-    // Emit socket event for real-time update
     const io = req.app.get('io');
     io.emit('new_post', post);
 
@@ -32,18 +50,44 @@ const createPost = async (req, res) => {
   }
 };
 
+const Follow = require('../models/Follow');
+
 // @desc    Get all posts (Feed algorithm)
 // @route   GET /api/posts
 const getPosts = async (req, res) => {
   try {
     const user = req.user;
-    const { category, skill, page = 1, limit = 10 } = req.query;
+    const pageNum = Math.max(1, parseInt(req.query.page) || 1);
+    const limitNum = Math.min(50, Math.max(1, parseInt(req.query.limit) || 10));
+    const { category, skill, type, following, sort } = req.query;
     
     let query = {
-      notInterested: { $ne: req.user._id } // Filter out posts user specifically marked as not interested
+      notInterested: { $nin: [req.user._id] }
     };
+    
     if (category && category !== 'All') query.type = category;
+    if (type && type !== 'all') query.type = type;
     if (skill) query.skills = { $in: [skill] };
+
+    // Filter by following users
+    if (following === 'true' || following === true) {
+      const followingDocs = await Follow.find({ 
+        follower: user._id, 
+        status: 'accepted' 
+      }).select('following');
+      const followingUsers = followingDocs.map(doc => doc.following);
+      
+      if (followingUsers.length === 0) {
+        return res.json([]);
+      }
+      
+      query.userId = { $in: followingUsers };
+    }
+
+    let sortOption = { createdAt: -1 };
+    if (sort === 'likes') {
+      sortOption = { likes: -1 };
+    }
 
     const posts = await Post.find(query)
       .populate('userId', 'name avatarUrl skills goal experienceLevel isMentor mentorStatus')
@@ -56,9 +100,14 @@ const getPosts = async (req, res) => {
           select: 'name avatarUrl skills goal experienceLevel isMentor mentorStatus'
         }
       })
-      .sort({ createdAt: -1 })
-      .skip((page - 1) * limit)
-      .limit(Number(limit));
+      .sort(sortOption)
+      .skip((pageNum - 1) * limitNum)
+      .limit(limitNum);
+
+    // If sort by likes, return directly without scoring
+    if (sort === 'likes') {
+      return res.json(posts);
+    }
 
     // Dynamic scoring for the feed
     const scoredPosts = posts.map(post => {
@@ -69,7 +118,7 @@ const getPosts = async (req, res) => {
       score += (post.comments ? post.comments.length : 0) * 10;
       score += (post.saves ? post.saves.length : 0) * 20;
       score += (post.shares || 0) * 15;
-      score += (post.interested ? post.interested.length : 0) * 25; // Interested boost
+      score += (post.interested ? post.interested.length : 0) * 25;
 
       // Match skills boost
       if (user.skills && post.skills) {
@@ -79,7 +128,7 @@ const getPosts = async (req, res) => {
 
       // Personalized boost for interested users
       if (post.interested && post.interested.includes(user._id)) {
-        score += 500; // Heavy boost for explicitly interested content
+        score += 500;
       }
       
       // Recency Decay
@@ -666,6 +715,72 @@ const uploadPostImage = async (req, res) => {
   }
 };
 
+// @desc    Vote on poll
+// @route   PUT /api/posts/:id/vote
+const votePoll = async (req, res) => {
+  try {
+    const { optionIndexes, remove } = req.body;
+    const post = await Post.findById(req.params.id);
+
+    if (!post) {
+      return res.status(404).json({ message: 'Post not found' });
+    }
+
+    if (!post.poll || post.type !== 'Poll') {
+      return res.status(400).json({ message: 'Post is not a poll' });
+    }
+
+    const userId = req.user._id;
+    const hasVoted = post.poll.votedUsers.some(id => id.toString() === userId.toString());
+
+    if (remove) {
+      post.poll.options.forEach(opt => {
+        opt.votes = opt.votes.filter(id => id.toString() !== userId.toString());
+        opt.voteCount = opt.votes.length;
+      });
+      post.poll.votedUsers = post.poll.votedUsers.filter(id => id.toString() !== userId.toString());
+      post.poll.totalVotes = post.poll.votedUsers.length;
+    } else {
+      if (post.poll.isMultiple) {
+        const newVotes = Array.isArray(optionIndexes) ? optionIndexes : [optionIndexes];
+        newVotes.forEach(idx => {
+          if (post.poll.options[idx] && !post.poll.options[idx].votes.includes(userId)) {
+            post.poll.options[idx].votes.push(userId);
+            post.poll.options[idx].voteCount += 1;
+          }
+        });
+        if (!post.poll.votedUsers.some(id => id.toString() === userId.toString())) {
+          post.poll.votedUsers.push(userId);
+        }
+      } else {
+        if (!hasVoted) {
+          const idx = Array.isArray(optionIndexes) ? optionIndexes[0] : optionIndexes;
+          if (post.poll.options[idx]) {
+            post.poll.options[idx].votes.push(userId);
+            post.poll.options[idx].voteCount += 1;
+            post.poll.votedUsers.push(userId);
+          }
+        }
+      }
+      post.poll.totalVotes = post.poll.votedUsers.length;
+    }
+
+    await post.save();
+
+    const populatedPost = await Post.findById(post._id)
+      .populate('userId', 'name avatarUrl skills goal experienceLevel isMentor mentorStatus')
+      .populate('likes', 'name _id avatarUrl')
+      .populate('saves', 'name _id avatarUrl');
+
+    const io = req.app.get('io');
+    io.emit('post_updated', populatedPost);
+
+    res.json(populatedPost);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
 module.exports = {
   getProfileStats,
   getPostById,
@@ -686,5 +801,6 @@ module.exports = {
   deletePost,
   markCommentHelpful,
   interestedPost,
-  notInterestedPost
+  notInterestedPost,
+  votePoll
 };

@@ -1,6 +1,6 @@
 import React from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, User, BookOpen, MessageCircle, Calendar, Star, Bell, LogOut, ArrowLeft, X } from 'lucide-react';
+import { LayoutDashboard, User, BookOpen, MessageCircle, Calendar, Star, Bell, LogOut, ArrowLeft, X, Users, DollarSign, BarChart3, Settings } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
 import { getAvatarUrl } from '../utils/avatar';
 import { cn } from '../utils/cn';
@@ -9,10 +9,14 @@ const navItems = [
   { name: 'Overview', icon: LayoutDashboard, path: '/mentor-dashboard/overview', color: 'text-indigo-500' },
   { name: 'My Profile', icon: User, path: '/mentor-dashboard/profile', color: 'text-blue-500' },
   { name: 'Courses', icon: BookOpen, path: '/mentor-dashboard/courses', color: 'text-emerald-500' },
-  { name: 'Messages', icon: MessageCircle, path: '/messages', color: 'text-violet-500' },
+  { name: 'Students', icon: Users, path: '/mentor-dashboard/students', color: 'text-cyan-500' },
   { name: 'Schedule', icon: Calendar, path: '/mentor-dashboard/schedule', color: 'text-orange-500' },
+  { name: 'Earnings', icon: DollarSign, path: '/mentor-dashboard/earnings', color: 'text-green-500' },
+  { name: 'Analytics', icon: BarChart3, path: '/mentor-dashboard/analytics', color: 'text-violet-500' },
   { name: 'Reviews', icon: Star, path: '/mentor-dashboard/reviews', color: 'text-amber-500' },
+  { name: 'Messages', icon: MessageCircle, path: '/mentor-dashboard/messages', color: 'text-purple-500' },
   { name: 'Notifications', icon: Bell, path: '/mentor-dashboard/notifications', color: 'text-rose-500' },
+  { name: 'Settings', icon: Settings, path: '/mentor-dashboard/settings', color: 'text-slate-500' },
 ];
 
 const MentorSidebar = ({ isOpen, setIsOpen }) => {

@@ -1,6 +1,6 @@
 import React from "react";
 import { NavLink, useNavigate } from "react-router-dom";
-import { BookOpen, Users, GraduationCap, Star, LogOut, ArrowLeft, X, LayoutDashboard } from "lucide-react";
+import { BookOpen, Users, GraduationCap, Star, LogOut, ArrowLeft, X, LayoutDashboard, Trophy, Route, Target, Award, BarChart3 } from "lucide-react";
 import { useAuth } from "../auth/AuthContext";
 import { getAvatarUrl } from "../utils/avatar";
 import { cn } from "../utils/cn";
@@ -13,8 +13,14 @@ const LearnSidebar = ({ isOpen, setIsOpen }) => {
 
   const navItems = [
     { name: "Explore Courses", icon: BookOpen, path: "/learn/explore", color: "text-indigo-500" },
-    { name: "Mentors", icon: Users, path: "/learn/mentors", color: "text-blue-500" },
     { name: "My Learning", icon: GraduationCap, path: "/learn/my-learning", color: "text-emerald-500" },
+    { name: "Learning Paths", icon: Route, path: "/learn/paths", color: "text-blue-500" },
+    { name: "Mentors", icon: Users, path: "/learn/mentors", color: "text-cyan-500" },
+  ];
+
+  const bottomItems = [
+    { name: "Achievements", icon: Award, path: "/learn/achievements", color: "text-amber-500" },
+    { name: "Leaderboard", icon: Trophy, path: "/learn/leaderboard", color: "text-rose-500" },
   ];
 
   if (user?.mentorStatus === 'approved') {
@@ -47,9 +53,7 @@ const LearnSidebar = ({ isOpen, setIsOpen }) => {
             onClick={handleNavClick}
             className={({ isActive }) => cn(
               "flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 group",
-              isActive
-                ? "bg-white shadow-sm text-indigo-600 border border-slate-100"
-                : "text-slate-500 hover:bg-slate-50 hover:text-slate-900"
+              isActive ? "bg-white shadow-sm text-indigo-600 border border-slate-100" : "text-slate-500 hover:bg-slate-50 hover:text-slate-900"
             )}
           >
             <div className="flex items-center gap-3">
@@ -59,6 +63,25 @@ const LearnSidebar = ({ isOpen, setIsOpen }) => {
           </NavLink>
         ))}
       </nav>
+
+      <div className="pt-3 border-t border-slate-100 space-y-1">
+        <p className="px-3 mb-2 text-[10px] font-bold text-slate-300 uppercase tracking-widest">Community</p>
+        {bottomItems.map((item) => (
+          <NavLink
+            key={item.name}
+            to={item.path}
+            onClick={handleNavClick}
+            className={({ isActive }) => cn(
+              "flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200",
+              isActive ? "bg-white shadow-sm text-indigo-600 border border-slate-100" : "text-slate-500 hover:bg-slate-50 hover:text-slate-900"
+            )}
+          >
+            <item.icon className={cn("w-[18px] h-[18px]", item.color)} />
+            <span>{item.name}</span>
+          </NavLink>
+        ))}
+      </div>
+
       <div className="mt-auto pt-4 border-t border-slate-100">
         <button onClick={handleLogout} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold text-slate-400 hover:bg-rose-50 hover:text-rose-600 transition-all duration-200">
           <LogOut className="w-[18px] h-[18px]" />

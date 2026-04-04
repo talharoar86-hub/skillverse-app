@@ -1,7 +1,7 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { Search, Bell, ChevronDown, Menu, MessageSquare, X } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useNotifications } from '../context/NotificationContext';
 import { getAvatarUrl } from '../utils/avatar';
 import { cn } from '../utils/cn';
@@ -19,6 +19,8 @@ const Topbar = ({ onMenuClick }) => {
   const { unreadCount } = useNotifications();
   const topbarRef = useRef(null);
   const [searchExpanded, setSearchExpanded] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const navigate = useNavigate();
 
   // Close dropdowns when clicking outside the topbar
   useEffect(() => {
@@ -44,6 +46,14 @@ const Topbar = ({ onMenuClick }) => {
     document.addEventListener('keydown', handleEscape);
     return () => document.removeEventListener('keydown', handleEscape);
   }, [closeDropdown]);
+
+  const handleSearch = (e) => {
+    e.preventDefault();
+    if (searchQuery.trim()) {
+      navigate(`/search?q=${encodeURIComponent(searchQuery.trim())}&type=all&page=1`);
+      setSearchExpanded(false);
+    }
+  };
 
   return (
     <header ref={topbarRef} className="h-14 sm:h-[60px] md:h-[68px] lg:h-[72px] bg-white/80 backdrop-blur-md border-b border-slate-100 sticky top-0 z-[50] w-full shadow-[0_1px_15px_-10px_rgba(0,0,0,0.05)]">
@@ -79,23 +89,29 @@ const Topbar = ({ onMenuClick }) => {
           "flex-1 max-w-full sm:max-w-[300px] md:max-w-[400px] lg:max-w-[520px] xl:max-w-[640px] px-1 sm:px-2 md:px-4 transition-all",
           searchExpanded ? "block" : "hidden sm:block"
         )}>
-          <div className="relative group w-full">
+          <form onSubmit={handleSearch} className="relative group w-full">
             <Search className="absolute left-2.5 sm:left-3 md:left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-indigo-600 transition-colors" />
             <input
               type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search skills, mentors, posts..."
               className="w-full bg-slate-100/60 border border-transparent focus:bg-white focus:border-indigo-100 focus:ring-4 focus:ring-indigo-50/50 focus:outline-none rounded-xl sm:rounded-2xl py-2 sm:py-2 md:py-2.5 pl-8 sm:pl-9 md:pl-11 pr-3 sm:pr-4 text-xs sm:text-sm font-bold text-slate-800 placeholder-slate-400 transition-all duration-300"
             />
             {/* Close search on mobile */}
             {searchExpanded && (
               <button
-                onClick={() => setSearchExpanded(false)}
+                type="button"
+                onClick={() => {
+                  setSearchExpanded(false);
+                  setSearchQuery('');
+                }}
                 className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-slate-600 sm:hidden"
               >
                 <X className="w-4 h-4" />
               </button>
             )}
-          </div>
+          </form>
         </div>
 
         {/* Right: Actions & Profile */}

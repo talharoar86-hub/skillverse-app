@@ -3,6 +3,7 @@ const Post = require('../models/Post');
 const Enrollment = require('../models/Enrollment');
 const { Course } = require('../models/Learning');
 const ExchangeActivity = require('../models/ExchangeActivity');
+const MentorProfileView = require('../models/MentorProfileView');
 
 const SENSITIVE_FIELDS = '-password -email -googleId -resetPasswordToken -resetPasswordExpire -isOnline -isEmailVerified';
 
@@ -110,13 +111,36 @@ const getPublicProfile = async (req, res) => {
       mentorProfileData = {
         bio: user.mentorProfile?.bio,
         expertise: user.mentorProfile?.skills?.map(s => s.name || s) || [],
+        skills: user.mentorProfile?.skills || [],
         rating: user.mentorProfile?.rating || 5.0,
         experienceYears: user.mentorProfile?.experience,
         available: true,
         headline: user.mentorProfile?.headline,
         teachingPreference: user.mentorProfile?.teachingPreference,
-        pricing: user.mentorProfile?.pricing
+        pricing: user.mentorProfile?.pricing,
+        coverImageUrl: user.mentorProfile?.coverImageUrl,
+        videoIntroUrl: user.mentorProfile?.videoIntroUrl,
+        certifications: user.mentorProfile?.certifications || [],
+        languages: user.mentorProfile?.languages || [],
+        portfolioLinks: user.mentorProfile?.portfolioLinks || {}
       };
+
+      // Track profile view (only when someone else views the profile)
+      if (!isOwner) {
+        try {
+          await MentorProfileView.create({
+            mentor: userId,
+            viewer: req.user._id
+          });
+          // Increment profile views counter
+          await User.findByIdAndUpdate(userId, {
+            $inc: { 'mentorProfile.profileViews': 1 }
+          });
+        } catch (e) {
+          // Don't fail the request if tracking fails
+          console.log('Profile view tracking skipped:', e.message);
+        }
+      }
     }
 
     res.json({

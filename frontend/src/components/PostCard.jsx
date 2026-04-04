@@ -11,6 +11,7 @@ import {
   Share2, 
   Copy, 
   Check, 
+  CheckCircle,
   MoreHorizontal,
   X,
   Trash2,
@@ -22,7 +23,8 @@ import {
   GraduationCap,
   ArrowRightLeft,
   Link2,
-  Shield
+  Shield,
+  BarChart3
 } from 'lucide-react';
 import { cn } from '../utils/cn';
 import { useSocket } from '../context/SocketContext';
@@ -191,6 +193,18 @@ const PostCard = ({ post: initialPost, onUpdate, autoOpenComments = false }) => 
     }
   };
 
+  const handlePollVote = async (optionIndex) => {
+    console.log('Voting:', post._id, optionIndex);
+    console.log('User ID:', user?._id);
+    try {
+      const updatedPost = await postService.votePoll(post._id, optionIndex);
+      console.log('Vote success:', updatedPost);
+      setPost(updatedPost);
+    } catch (err) {
+      console.error('Vote failed', err);
+    }
+  };
+
   const handleDelete = async () => {
     if (!window.confirm('Are you sure you want to delete this post?')) return;
     setIsDeleting(true);
@@ -257,6 +271,13 @@ const PostCard = ({ post: initialPost, onUpdate, autoOpenComments = false }) => 
         label: 'Guide', 
         color: 'text-violet-600 bg-violet-50 border-violet-100', 
         dot: 'bg-violet-500' 
+      };
+    }
+    if (post.type === 'Poll') {
+      return { 
+        label: 'Poll', 
+        color: 'text-purple-600 bg-purple-50 border-purple-100', 
+        dot: 'bg-purple-500' 
       };
     }
     return { 
@@ -488,6 +509,95 @@ const PostCard = ({ post: initialPost, onUpdate, autoOpenComments = false }) => 
           <p className="text-slate-800 text-[15px] sm:text-[16px] leading-relaxed font-medium tracking-tight whitespace-pre-wrap">
             {post.content}
           </p>
+        )}
+
+        {/* Poll Display */}
+        {post.type === 'Poll' && post.poll && (
+          <div className="mt-4">
+            <div className="flex items-center gap-2 mb-3">
+              <BarChart3 className="w-5 h-5 text-purple-600" />
+              <span className="text-xs font-bold text-purple-600 bg-purple-50 px-2 py-0.5 rounded-full">
+                POLL
+              </span>
+            </div>
+            
+            <h4 className="font-bold text-lg text-slate-900 mb-4">{post.poll.question}</h4>
+            
+            <div className="space-y-2.5">
+              {post.poll.options?.map((option, idx) => {
+                const votes = option.voteCount || 0;
+                const total = post.poll.totalVotes || 0;
+                const percent = total > 0 ? Math.round((votes / total) * 100) : 0;
+                const userId = user?._id ? (typeof user._id === 'string' ? user._id : user._id._id || user._id.toString()) : null;
+                const hasVoted = userId && post.poll.votedUsers?.some(id => {
+                  const idStr = typeof id === 'object' ? (id._id ? id._id.toString() : id.toString()) : id.toString();
+                  return idStr === userId;
+                });
+                const isMulti = post.poll.isMultiple;
+                const pollEnded = post.poll.endsAt && new Date(post.poll.endsAt) < new Date();
+                const canVote = !hasVoted && !pollEnded;
+                
+                return (
+                  <button
+                    key={idx}
+                    onClick={() => canVote && handlePollVote(idx)}
+                    disabled={!canVote}
+                    className={`w-full text-left px-4 py-3 rounded-xl font-medium transition-all relative overflow-hidden group ${
+                      hasVoted 
+                        ? 'ring-2 ring-purple-500 bg-purple-50' 
+                        : canVote 
+                          ? 'bg-slate-50 hover:bg-slate-100 border border-slate-200 hover:border-purple-300 cursor-pointer' 
+                          : 'bg-slate-50 border border-slate-200 opacity-60 cursor-not-allowed'
+                    }`}
+                  >
+                    <div 
+                      className="absolute inset-0 bg-purple-100 transition-all duration-500" 
+                      style={{ width: `${percent}%`, opacity: hasVoted ? 0.4 : 0.3 }}
+                    />
+                    <div className="relative flex justify-between items-center">
+                      <div className="flex items-center gap-2">
+                        {hasVoted && <CheckCircle className="w-4 h-4 text-purple-600 flex-shrink-0" />}
+                        <span className={hasVoted ? 'text-purple-700' : 'text-slate-700'}>
+                          {option.text}
+                        </span>
+                      </div>
+                      {hasVoted && (
+                        <span className="text-purple-600 font-bold">{percent}%</span>
+                      )}
+                    </div>
+                    
+                    {!hasVoted && canVote && (
+                      <div className="absolute right-3 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <div className="w-5 h-5 rounded-full border-2 border-slate-300 group-hover:border-purple-400" />
+                      </div>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+            
+            <div className="flex items-center justify-between mt-4 pt-3 border-t border-slate-100">
+              <div className="flex items-center gap-4">
+                <span className="text-sm font-semibold text-slate-600">
+                  {post.poll.totalVotes} vote{post.poll.totalVotes !== 1 ? 's' : ''}
+                </span>
+                {post.poll.isMultiple && (
+                  <span className="text-xs font-medium text-slate-400 bg-slate-100 px-2 py-0.5 rounded">
+                    Multiple choice
+                  </span>
+                )}
+              </div>
+              {post.poll.endsAt && (
+                <span className="text-xs font-medium text-slate-500">
+                  {new Date(post.poll.endsAt) < new Date() ? (
+                    <span className="text-red-500">Ended</span>
+                  ) : (
+                    <>Ends {formatTimeShort(post.poll.endsAt)}</>
+                  )}
+                </span>
+              )}
+            </div>
+          </div>
         )}
 
         {/* Embedded Repost Content */}

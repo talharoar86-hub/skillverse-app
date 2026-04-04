@@ -155,7 +155,11 @@ const MessageDropdown = ({ isOpen, onClose }) => {
               return (
                 <button
                   key={conversation._id}
-                  onClick={() => { onClose(); navigate(`/messages/${conversation._id}`); }}
+                  onClick={() => { 
+                    onClose(); 
+                    const convId = conversation._id || conversation.conversationId;
+                    if (convId) navigate(`/messages/${convId}`); 
+                  }}
                   className={cn(
                     'w-full flex items-start gap-2.5 sm:gap-3 px-3 sm:px-4 py-2.5 sm:py-3 hover:bg-slate-50 transition-colors text-left',
                     hasUnread && 'bg-indigo-50/30'

@@ -51,12 +51,24 @@ const PostSchema = new mongoose.Schema({
   }],
   type: {
     type: String,
-    enum: ['Post', 'Guide', 'Question', 'Update'],
+    enum: ['Post', 'Guide', 'Question', 'Update', 'Poll'],
     default: 'Post'
   },
   isResolved: {
     type: Boolean,
     default: false
+  },
+  poll: {
+    question: { type: String, default: '' },
+    options: [{
+      text: { type: String, required: true },
+      votes: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
+      voteCount: { type: Number, default: 0 }
+    }],
+    isMultiple: { type: Boolean, default: false },
+    endsAt: { type: Date },
+    totalVotes: { type: Number, default: 0 },
+    votedUsers: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }]
   },
   engagementScore: {
     type: Number,

@@ -32,7 +32,7 @@ const Layout = () => {
       />
 
       {/* Main Layout */}
-      <div className="max-w-[1400px] mx-auto flex gap-4 lg:gap-6 px-3 lg:px-6 transition-all duration-300">
+      <div className="max-w-[1400px] mx-auto flex justify-center gap-4 lg:gap-6 px-3 lg:px-6 transition-all duration-300">
 
         {/* Left Sidebar - Desktop */}
         <aside className="hidden lg:flex lg:flex-col w-[240px] shrink-0 sticky top-[72px] h-[calc(100vh-72px)] overflow-y-auto border-r border-slate-100 custom-scrollbar pt-4 pb-6 px-2">
@@ -41,7 +41,7 @@ const Layout = () => {
 
         {/* Center Content */}
         <main className={cn(
-          "flex-1 min-w-0 animate-fade-in relative py-4 lg:py-6 px-2 lg:px-0",
+          "flex-1 min-w-0 mx-auto animate-fade-in relative py-4 lg:py-6 px-2 lg:px-0",
           isHomePage ? "max-w-[640px]" : "max-w-[800px]"
         )}>
           <Outlet />

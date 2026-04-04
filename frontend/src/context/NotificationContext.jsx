@@ -33,7 +33,9 @@ export const NotificationProvider = ({ children }) => {
       setUnreadCount(prev => prev + 1);
     };
     socket.on('notification_received', handleNotification);
-    return () => socket.off('notification_received', handleNotification);
+    return () => {
+      socket.off('notification_received', handleNotification);
+    };
   }, [socket]);
 
   const decrementCount = useCallback((count = 1) => {

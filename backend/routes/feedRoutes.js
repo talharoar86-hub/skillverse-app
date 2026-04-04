@@ -1,7 +1,9 @@
 const express = require('express');
 const { protect } = require('../middleware/auth');
 const router = express.Router();
-const { courseService, enrollmentService, profileService, mentorService, exchangeService } = require('../services');
+const { profileService, mentorService, exchangeService } = require('../services');
+const { Course } = require('../models/Learning');
+const Enrollment = require('../models/Enrollment');
 
 // Unified feed suggestions endpoint
 // Returns aggregated data for smart feed cards based on user goal
@@ -29,15 +31,19 @@ router.get('/suggestions', protect, async (req, res) => {
       case 'Learn':
         // Learn goal: courses, mentors, learning stats
         try {
-          const [coursesData, mentorsData, statsData] = await Promise.all([
-            courseService.getCourses(),
+          const [coursesData, mentorsData, enrollments] = await Promise.all([
+            Course.find({ status: 'published' }).populate('mentorId', 'name avatarUrl mentorProfile.headline').sort({ createdAt: -1 }).limit(6).lean(),
             profileService.getDiscovery('Mentor'),
-            enrollmentService.getStats()
+            Enrollment.find({ user: userId })
           ]);
+
+          const enrolled = enrollments.length;
+          const completed = enrollments.filter(e => e.progress >= 100).length;
+          const hours = enrollments.reduce((sum, e) => sum + (e.completedLessons?.length || 0) * 0.5, 0);
           
           response.courses = coursesData || [];
           response.mentors = mentorsData?.users || [];
-          response.stats = statsData || {};
+          response.stats = { enrolled, completed, hours: Math.round(hours) };
         } catch (error) {
           console.error('Error fetching Learn data:', error);
           // Continue with empty arrays rather than failing completely

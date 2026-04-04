@@ -90,8 +90,12 @@ const BecomeMentor = () => {
         pricing: Number(formData.pricing) || 0,
         portfolioLinks: formData.portfolioLinks
       });
-      setMentorStatus('pending');
-      if (result.user) updateUser(result.user);
+      const status = result.mentorStatus || 'pending';
+      setMentorStatus(status);
+      updateUser(result);
+      if (status === 'approved') {
+        navigate('/mentor-dashboard/overview', { replace: true });
+      }
     } catch (err) {
       console.error('Application failed', err);
     } finally {

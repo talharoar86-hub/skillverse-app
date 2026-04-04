@@ -25,6 +25,7 @@ const LearnersDiscoveryPage = () => {
   };
 
   const handleMessage = async (userId) => {
+    if (!userId) { console.error('User ID is missing'); return; }
     try {
       const conversation = await messageService.createConversation(userId);
       navigate(`/messages/${conversation._id || conversation.conversationId}`);

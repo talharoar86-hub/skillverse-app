@@ -1,10 +1,10 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useAuth } from '../auth/AuthContext';
 import { useSocket } from '../context/SocketContext';
 import { notificationService, mentorshipService } from '../services/api';
 import {
   Bell, Check, X, Loader2, User, BookOpen, Calendar,
-  Star, MessageCircle, Clock, CheckCircle2
+  Star, MessageCircle, Clock, CheckCircle2, Filter, Trash2, ChevronLeft, ChevronRight
 } from 'lucide-react';
 import { cn } from '../utils/cn';
 
@@ -21,22 +21,33 @@ const typeConfig = {
   system:                { icon: Bell, color: 'bg-slate-50 text-slate-600', label: 'System' },
 };
 
+const FILTER_OPTIONS = [
+  { key: 'all', label: 'All' },
+  { key: 'unread', label: 'Unread' },
+  { key: 'mentorship_request', label: 'Requests' },
+  { key: 'course_enrolled', label: 'Enrollments' },
+  { key: 'session_booked', label: 'Sessions' },
+  { key: 'new_review', label: 'Reviews' },
+];
+
+const PAGE_SIZE = 20;
+
 const MentorNotifications = () => {
   const { user } = useAuth();
   const socket = useSocket();
   const [notifications, setNotifications] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [processingIds, setProcessingIds] = useState(new Set());
+  const [filter, setFilter] = useState('all');
+  const [page, setPage] = useState(1);
 
   useEffect(() => { loadNotifications(); }, []);
 
   useEffect(() => {
     if (!socket) return;
-
     const handleNew = (notification) => {
       setNotifications(prev => [notification, ...prev]);
     };
-
     socket.on('notification_received', handleNew);
     return () => socket.off('notification_received', handleNew);
   }, [socket]);
@@ -44,13 +55,30 @@ const MentorNotifications = () => {
   const loadNotifications = async () => {
     try {
       const data = await notificationService.getNotifications();
-      setNotifications(data);
+      setNotifications(Array.isArray(data) ? data : []);
     } catch (err) {
       console.error('Failed to load notifications', err);
     } finally {
       setIsLoading(false);
     }
   };
+
+  const filtered = useMemo(() => {
+    let result = notifications;
+    if (filter === 'unread') {
+      result = result.filter(n => !n.isRead);
+    } else if (filter !== 'all') {
+      result = result.filter(n => n.type === filter);
+    }
+    return result;
+  }, [notifications, filter]);
+
+  const paginated = useMemo(() => {
+    const start = (page - 1) * PAGE_SIZE;
+    return filtered.slice(start, start + PAGE_SIZE);
+  }, [filtered, page]);
+
+  const totalPages = Math.ceil(filtered.length / PAGE_SIZE) || 1;
 
   const handleAccept = async (notification) => {
     const requestId = notification.metadata?.requestId;
@@ -97,6 +125,15 @@ const MentorNotifications = () => {
     }
   };
 
+  const handleDelete = async (id) => {
+    try {
+      await notificationService.deleteNotification(id);
+      setNotifications(prev => prev.filter(n => n._id !== id));
+    } catch (err) {
+      console.error('Failed to delete', err);
+    }
+  };
+
   const markAllRead = async () => {
     try {
       await notificationService.markAllRead();
@@ -105,6 +142,8 @@ const MentorNotifications = () => {
       console.error('Failed to mark all read', err);
     }
   };
+
+  useEffect(() => { setPage(1); }, [filter]);
 
   if (isLoading) {
     return (
@@ -118,7 +157,7 @@ const MentorNotifications = () => {
 
   return (
     <div className="space-y-6 animate-fade-in">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-2xl font-black text-slate-900 tracking-tight">Notifications</h1>
           <p className="text-sm text-slate-500 mt-1 font-medium">
@@ -135,25 +174,46 @@ const MentorNotifications = () => {
         )}
       </div>
 
-      {notifications.length === 0 ? (
+      {/* Filters */}
+      <div className="flex items-center gap-1.5 flex-wrap">
+        <Filter className="w-4 h-4 text-slate-400 mr-1" />
+        {FILTER_OPTIONS.map(opt => (
+          <button
+            key={opt.key}
+            onClick={() => setFilter(opt.key)}
+            className={cn(
+              "px-3 py-1.5 rounded-lg text-xs font-bold border transition-all",
+              filter === opt.key
+                ? "bg-indigo-50 text-indigo-600 border-indigo-200"
+                : "bg-white text-slate-500 border-slate-200 hover:border-slate-300"
+            )}
+          >
+            {opt.label}
+          </button>
+        ))}
+      </div>
+
+      {paginated.length === 0 ? (
         <div className="bg-white rounded-2xl border border-slate-100 shadow-sm py-16 text-center">
           <Bell className="w-12 h-12 text-slate-200 mx-auto mb-4" />
           <h3 className="text-lg font-black text-slate-900 mb-2">No notifications</h3>
-          <p className="text-sm text-slate-400 font-medium">You'll see updates about students, courses, and sessions here.</p>
+          <p className="text-sm text-slate-400 font-medium">
+            {filter !== 'all' ? 'No notifications match this filter.' : 'You\'ll see updates about students, courses, and sessions here.'}
+          </p>
         </div>
       ) : (
         <div className="space-y-2">
-          {notifications.map(notif => {
+          {paginated.map(notif => {
             const config = typeConfig[notif.type] || typeConfig.system;
             const Icon = config.icon;
             const isProcessing = processingIds.has(notif._id);
-            const hasAction = notif.type === 'mentorship_request' && notif.metadata?.requestId;
+            const hasAction = notif.type === 'mentorship_request' && notif.metadata?.requestId && !notif.isRead;
 
             return (
               <div
                 key={notif._id}
                 className={cn(
-                  "bg-white rounded-2xl border shadow-sm p-4 transition-all",
+                  "bg-white rounded-2xl border shadow-sm p-4 transition-all group",
                   notif.isRead ? 'border-slate-100' : 'border-indigo-100 bg-indigo-50/30'
                 )}
               >
@@ -175,8 +235,7 @@ const MentorNotifications = () => {
                       {new Date(notif.createdAt).toLocaleString()}
                     </p>
 
-                    {/* Action buttons for mentorship requests */}
-                    {hasAction && !notif.isRead && (
+                    {hasAction && (
                       <div className="flex items-center gap-2 mt-3">
                         <button
                           onClick={() => handleAccept(notif)}
@@ -209,18 +268,49 @@ const MentorNotifications = () => {
                     )}
                   </div>
 
-                  {!notif.isRead && !hasAction && (
+                  <div className="flex items-center gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                    {!notif.isRead && !hasAction && (
+                      <button
+                        onClick={() => handleMarkRead(notif._id)}
+                        className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors"
+                        title="Mark read"
+                      >
+                        <Check className="w-4 h-4" />
+                      </button>
+                    )}
                     <button
-                      onClick={() => handleMarkRead(notif._id)}
-                      className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors shrink-0"
+                      onClick={() => handleDelete(notif._id)}
+                      className="p-1.5 rounded-lg hover:bg-rose-50 text-slate-400 hover:text-rose-500 transition-colors"
+                      title="Delete"
                     >
-                      <Check className="w-4 h-4" />
+                      <Trash2 className="w-4 h-4" />
                     </button>
-                  )}
+                  </div>
                 </div>
               </div>
             );
           })}
+
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-center gap-3 pt-4">
+              <button
+                onClick={() => setPage(p => Math.max(1, p - 1))}
+                disabled={page === 1}
+                className="p-2 rounded-xl border border-slate-200 hover:bg-slate-50 disabled:opacity-30 transition-all"
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+              <span className="text-sm font-bold text-slate-600">{page} / {totalPages}</span>
+              <button
+                onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                disabled={page === totalPages}
+                className="p-2 rounded-xl border border-slate-200 hover:bg-slate-50 disabled:opacity-30 transition-all"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
+          )}
         </div>
       )}
     </div>

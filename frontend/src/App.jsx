@@ -1,10 +1,11 @@
-import React from 'react';
+import React, { lazy, Suspense } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import Layout from './components/Layout';
 import ErrorBoundary from './components/ErrorBoundary';
 import { AuthProvider, useAuth } from './auth/AuthContext';
 import { SocketProvider } from './context/SocketContext';
 import { NotificationProvider } from './context/NotificationContext';
+import { LearningProvider } from './context/LearningContext';
 
 // Auth Components
 import Login from './auth/Login';
@@ -24,6 +25,7 @@ import PublicProfileLayout from './profile/PublicProfileLayout';
 import PublicProfilePage from './profile/PublicProfilePage';
 import Notifications from './pages/Notifications';
 import PostDetail from './pages/PostDetail';
+import SearchResults from './pages/SearchResults';
 
 // Learn Dashboard
 import LearnLayout from './learn/LearnLayout';
@@ -31,21 +33,37 @@ import ExploreCourses from './learn/ExploreCourses';
 import MentorsPage from './learn/MentorsPage';
 import MyLearning from './learn/MyLearning';
 import BecomeMentor from './learn/BecomeMentor';
+import CourseDetail from './learn/CourseDetail';
+import LearningPaths from './learn/LearningPaths';
+import LearningPathDetail from './learn/LearningPathDetail';
+import Achievements from './learn/Achievements';
+import Leaderboard from './learn/Leaderboard';
 
-// Mentor Dashboard
-import MentorDashboardLayout from './mentor/MentorDashboardLayout';
-import MentorOverview from './mentor/MentorOverview';
-import MentorProfile from './mentor/MentorProfile';
-import MentorCourses from './mentor/MentorCourses';
-import MentorSchedule from './mentor/MentorSchedule';
-import MentorReviews from './mentor/MentorReviews';
-import MentorNotifications from './mentor/MentorNotifications';
+// Mentor Dashboard - Lazy loaded for performance
+const MentorDashboardLayout = lazy(() => import('./mentor/MentorDashboardLayout'));
+const MentorOverview = lazy(() => import('./mentor/MentorOverview'));
+const MentorProfile = lazy(() => import('./mentor/MentorProfile'));
+const MentorCourses = lazy(() => import('./mentor/MentorCourses'));
+const MentorSchedule = lazy(() => import('./mentor/MentorSchedule'));
+const MentorReviews = lazy(() => import('./mentor/MentorReviews'));
+const MentorNotifications = lazy(() => import('./mentor/MentorNotifications'));
+const MentorStudents = lazy(() => import('./mentor/MentorStudents'));
+const MentorEarnings = lazy(() => import('./mentor/MentorEarnings'));
+const MentorAnalytics = lazy(() => import('./mentor/MentorAnalytics'));
+const MentorSettings = lazy(() => import('./mentor/MentorSettings'));
+const MentorMessages = lazy(() => import('./mentor/MentorMessages'));
 
 // Message Dashboard
 import MessageLayout from './messages/MessageLayout';
 import ConversationList from './messages/ConversationList';
 import ChatView from './messages/ChatView';
 import FilteredConversationList from './messages/FilteredConversationList';
+
+const LoadingFallback = () => (
+  <div className="min-h-screen flex items-center justify-center bg-slate-50/50">
+    <div className="w-10 h-10 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin"></div>
+  </div>
+);
 
 // Simple guard for public routes (e.g. login/signup)
 const PublicRoute = ({ children }) => {
@@ -70,10 +88,11 @@ const OnboardingRoute = ({ children }) => {
 const App = () => {
   return (
     <ErrorBoundary>
+      <BrowserRouter>
       <AuthProvider>
       <SocketProvider>
         <NotificationProvider>
-        <BrowserRouter>
+          <LearningProvider>
           <Routes>
             {/* Public Auth Routes */}
             <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
@@ -87,6 +106,7 @@ const App = () => {
             {/* Protected Main App Routes inside Layout */}
             <Route path="/" element={<Layout />}>
               <Route index element={<HomeFeed />} />
+              <Route path="search" element={<SearchResults />} />
               <Route path="notifications" element={<Notifications />} />
               <Route path="post/:id" element={<PostDetail />} />
               <Route path="settings" element={<div className="p-8"><h1 className="text-3xl font-bold">Settings (Coming Soon)</h1><p className="text-slate-500 mt-2">Adjust your preferences here.</p></div>} />
@@ -105,20 +125,30 @@ const App = () => {
             <Route path="/learn" element={<LearnLayout />}>
               <Route index element={<Navigate to="/learn/explore" replace />} />
               <Route path="explore" element={<ExploreCourses />} />
+              <Route path="course/:courseId" element={<CourseDetail />} />
               <Route path="mentors" element={<MentorsPage />} />
               <Route path="my-learning" element={<MyLearning />} />
               <Route path="become-mentor" element={<BecomeMentor />} />
+              <Route path="paths" element={<LearningPaths />} />
+              <Route path="paths/:pathId" element={<LearningPathDetail />} />
+              <Route path="achievements" element={<Achievements />} />
+              <Route path="leaderboard" element={<Leaderboard />} />
             </Route>
 
-            {/* Dedicated Mentor Dashboard Layout */}
-            <Route path="/mentor-dashboard" element={<MentorDashboardLayout />}>
+            {/* Dedicated Mentor Dashboard Layout - Lazy Loaded */}
+            <Route path="/mentor-dashboard" element={<Suspense fallback={<LoadingFallback />}><MentorDashboardLayout /></Suspense>}>
               <Route index element={<Navigate to="/mentor-dashboard/overview" replace />} />
-              <Route path="overview" element={<MentorOverview />} />
-              <Route path="profile" element={<MentorProfile />} />
-              <Route path="courses" element={<MentorCourses />} />
-              <Route path="schedule" element={<MentorSchedule />} />
-              <Route path="reviews" element={<MentorReviews />} />
-              <Route path="notifications" element={<MentorNotifications />} />
+              <Route path="overview" element={<Suspense fallback={<LoadingFallback />}><MentorOverview /></Suspense>} />
+              <Route path="profile" element={<Suspense fallback={<LoadingFallback />}><MentorProfile /></Suspense>} />
+              <Route path="courses" element={<Suspense fallback={<LoadingFallback />}><MentorCourses /></Suspense>} />
+              <Route path="students" element={<Suspense fallback={<LoadingFallback />}><MentorStudents /></Suspense>} />
+              <Route path="earnings" element={<Suspense fallback={<LoadingFallback />}><MentorEarnings /></Suspense>} />
+              <Route path="analytics" element={<Suspense fallback={<LoadingFallback />}><MentorAnalytics /></Suspense>} />
+              <Route path="schedule" element={<Suspense fallback={<LoadingFallback />}><MentorSchedule /></Suspense>} />
+              <Route path="reviews" element={<Suspense fallback={<LoadingFallback />}><MentorReviews /></Suspense>} />
+              <Route path="messages" element={<Suspense fallback={<LoadingFallback />}><MentorMessages /></Suspense>} />
+              <Route path="notifications" element={<Suspense fallback={<LoadingFallback />}><MentorNotifications /></Suspense>} />
+              <Route path="settings" element={<Suspense fallback={<LoadingFallback />}><MentorSettings /></Suspense>} />
             </Route>
 
             {/* Dedicated Profile Dashboard Layout */}
@@ -150,13 +180,14 @@ const App = () => {
               <Route path="following" element={<PublicProfilePage />} />
             </Route>
             
-            {/* Fallback */}
+{/* Fallback */}
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
-        </BrowserRouter>
+          </LearningProvider>
         </NotificationProvider>
       </SocketProvider>
       </AuthProvider>
+    </BrowserRouter>
     </ErrorBoundary>
   );
 };

@@ -82,20 +82,49 @@ const UserSchema = new mongoose.Schema({
       linkedin: String,
       website: String
     },
+    coverImageUrl: String,
+    videoIntroUrl: String,
+    videoIntroPublicId: String,
+    certifications: [{
+      name: String,
+      issuer: String,
+      year: Number,
+      credentialUrl: String
+    }],
+    languages: [{
+      name: String,
+      proficiency: {
+        type: String,
+        enum: ['Basic', 'Conversational', 'Fluent', 'Native'],
+        default: 'Fluent'
+      }
+    }],
     totalStudents: { type: Number, default: 0 },
     rating: { type: Number, default: 5.0 },
     totalReviews: { type: Number, default: 0 },
     totalCourses: { type: Number, default: 0 },
-    totalSessions: { type: Number, default: 0 }
+    totalSessions: { type: Number, default: 0 },
+    profileViews: { type: Number, default: 0 },
+    lastProfileUpdate: Date
   },
   isOnline: {
     type: Boolean,
     default: false
   },
+  totalXP: {
+    type: Number,
+    default: 0
+  },
   resetPasswordToken: String,
   resetPasswordExpire: Date
 }, {
-  timestamps: true
+  timestamps: true,
+  toJSON: { virtuals: true },
+  toObject: { virtuals: true }
+});
+
+UserSchema.virtual('level').get(function() {
+  return Math.floor((this.totalXP || 0) / 1000) + 1;
 });
 
 // High-performance Indexes for Discovery
@@ -104,6 +133,9 @@ UserSchema.index({ onboardingComplete: 1 });
 UserSchema.index({ skills: 1 }); // Multikey index for array lookups
 UserSchema.index({ goal: 1, onboardingComplete: 1 }); // Compound index for filtering active groups
 UserSchema.index({ mentorStatus: 1 });
+UserSchema.index({ isMentor: 1, mentorStatus: 1 });
+UserSchema.index({ 'mentorProfile.skills.name': 1 });
+UserSchema.index({ isMentor: 1, 'mentorProfile.rating': -1 });
 
 // Hash password before saving
 UserSchema.pre('save', async function() {

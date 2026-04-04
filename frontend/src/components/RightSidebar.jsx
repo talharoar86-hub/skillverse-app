@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { Link } from 'react-router-dom';
-import { Users, TrendingUp, Zap, ChevronRight, Star, BookOpen, Clock, Target, CheckCircle2, MessageSquare, PlusCircle, BarChart3, RefreshCw } from 'lucide-react';
-import { profileService, courseService } from '../services/api';
+import { Users, TrendingUp, Zap, ChevronRight, Star, BookOpen, Clock, Target, CheckCircle2, MessageSquare, PlusCircle, BarChart3, RefreshCw, Flame } from 'lucide-react';
+import { profileService, courseService, enrollmentService } from '../services/api';
 import { useAuth } from '../auth/AuthContext';
 import { getAvatarUrl } from '../utils/avatar';
 
@@ -16,6 +16,7 @@ const RightSidebar = () => {
   const [matches, setMatches] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [weeklyProgress, setWeeklyProgress] = useState({ completed: 0, goal: 5 });
   const intervalRef = useRef(null);
 
   const fetchData = useCallback(async () => {
@@ -28,8 +29,11 @@ const RightSidebar = () => {
       const discoveryPromise = profileService.getDiscovery(discoveryGoal);
 
       let goalPromise;
+      let weeklyPromise = Promise.resolve(null);
+      
       if (user?.goal === 'Learn') {
         goalPromise = courseService.getCourses();
+        weeklyPromise = enrollmentService.getStats();
       } else if (user?.goal === 'Mentor') {
         goalPromise = Promise.all([
           profileService.getSidebarStats(),
@@ -41,12 +45,18 @@ const RightSidebar = () => {
         goalPromise = Promise.resolve(null);
       }
 
-      const [discoveryData, goalData] = await Promise.all([discoveryPromise, goalPromise]);
+      const [discoveryData, goalData, weeklyData] = await Promise.all([discoveryPromise, goalPromise, weeklyPromise]);
 
       setMentors(discoveryData?.users?.slice(0, 4) || []);
 
       if (user?.goal === 'Learn') {
         setCourses(goalData?.slice(0, 2) || []);
+        if (weeklyData) {
+          setWeeklyProgress({
+            completed: weeklyData.sessionsCompletedThisWeek || 0,
+            goal: weeklyData.weeklyGoal || 5
+          });
+        }
       } else if (user?.goal === 'Mentor' && Array.isArray(goalData)) {
         setStats(goalData[0]);
         setRequests(goalData[1]);
@@ -117,14 +127,19 @@ const RightSidebar = () => {
 
   if (loading && mentors.length === 0) return <LoadingSkeleton />;
 
-  // --- Helper for "Coming Soon" Boxes ---
-  const ComingSoonBox = ({ title, icon: Icon, color = "indigo" }) => (
-    <div className="bg-white rounded-2xl border border-dashed border-slate-200 px-4 py-8 shadow-sm flex flex-col items-center justify-center text-center">
-      <div className={`w-12 h-12 rounded-2xl bg-${color}-50 flex items-center justify-center mb-3`}>
-        <Icon className={`w-6 h-6 text-${color}-500 opacity-40`} />
+  // --- Helper for Placeholder Widgets ---
+  const PlaceholderWidget = ({ title, link, linkText = 'See all', icon: Icon, color = "indigo" }) => (
+    <div className="bg-white rounded-2xl border border-slate-100 px-4 py-5 shadow-sm">
+      <div className="flex items-center justify-between mb-5">
+        <h3 className="font-bold text-slate-900 text-[15px] flex items-center gap-2">
+          <Icon className={`w-4 h-4 text-${color}-600`} />
+          {title}
+        </h3>
+        <Link to={link} className="text-xs font-bold text-indigo-600 hover:text-indigo-700 transition-colors">
+          {linkText}
+        </Link>
       </div>
-      <h3 className="font-bold text-slate-800 text-sm mb-1">{title}</h3>
-      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest italic">Coming Soon</p>
+      <p className="text-xs text-slate-400 text-center py-4">No data available yet</p>
     </div>
   );
 
@@ -139,7 +154,9 @@ const RightSidebar = () => {
               <BookOpen className="w-4 h-4 text-indigo-600" />
               Recommended Courses
             </h3>
-            <button className="text-xs font-bold text-indigo-600">See all</button>
+            <Link to="/learn/explore" className="text-xs font-bold text-indigo-600 hover:text-indigo-700 transition-colors">
+              See all
+            </Link>
           </div>
           <div className="space-y-4">
             {courses.map((course, i) => (
@@ -154,10 +171,10 @@ const RightSidebar = () => {
           </div>
         </div>
       ) : (
-        <ComingSoonBox title="Recommended Courses" icon={BookOpen} color="indigo" />
+        <PlaceholderWidget title="Recommended Courses" link="/learn/explore" icon={BookOpen} color="indigo" />
       )}
       
-      <ComingSoonBox title="Your Skill Roadmap" icon={Target} color="indigo" />
+      <PlaceholderWidget title="Your Skill Roadmap" link="/learn/paths" icon={Target} color="indigo" />
     </>
   );
 
@@ -172,7 +189,9 @@ const RightSidebar = () => {
               <MessageSquare className="w-4 h-4 text-emerald-500" />
               Active Mentee Requests
             </h3>
-            <span className="text-[10px] font-black bg-rose-50 text-rose-500 px-2 py-0.5 rounded-full">{requests.length} New</span>
+            <Link to="/mentor-dashboard/students" className="text-[10px] font-black bg-rose-50 text-rose-500 px-2 py-0.5 rounded-full hover:bg-rose-100 transition-colors">
+              {requests.length} New
+            </Link>
           </div>
           <div className="space-y-4">
             {requests.map((req, i) => (
@@ -184,15 +203,15 @@ const RightSidebar = () => {
                   <p className="text-xs font-bold text-slate-800 truncate">{req.name}</p>
                   <p className="text-[10px] text-slate-400 font-medium truncate">{req.skill}</p>
                 </div>
-                <button className="p-1.5 hover:bg-slate-50 text-indigo-600 rounded-lg transition-colors">
+                <Link to="/mentor-dashboard/students" className="p-1.5 hover:bg-slate-50 text-indigo-600 rounded-lg transition-colors">
                   <ChevronRight className="w-4 h-4" />
-                </button>
+                </Link>
               </div>
             ))}
           </div>
         </div>
       ) : (
-        <ComingSoonBox title="Mentee Requests" icon={MessageSquare} color="emerald" />
+        <PlaceholderWidget title="Mentee Requests" link="/mentor-dashboard/students" icon={MessageSquare} color="emerald" />
       )}
 
       {/* Profile Stats Widget */}
@@ -211,9 +230,9 @@ const RightSidebar = () => {
             <p className="text-[10px] font-bold opacity-50 uppercase mt-1">Avg. Rating</p>
           </div>
         </div>
-        <button className="w-full mt-5 bg-indigo-600 hover:bg-indigo-700 py-3 rounded-xl font-bold text-xs transition-all flex items-center justify-center gap-2">
+        <Link to="/mentor-dashboard/courses" className="w-full mt-5 bg-indigo-600 hover:bg-indigo-700 py-3 rounded-xl font-bold text-xs transition-all flex items-center justify-center gap-2">
           <PlusCircle className="w-4 h-4" /> Create Course
-        </button>
+        </Link>
       </div>
     </>
   );
@@ -229,7 +248,9 @@ const RightSidebar = () => {
               <Zap className="w-4 h-4 text-orange-500" />
               Top Skill Matches
             </h3>
-            <button className="text-xs font-bold text-indigo-600">See all</button>
+            <Link to="/messages/exchangers" className="text-xs font-bold text-indigo-600 hover:text-indigo-700 transition-colors">
+              See all
+            </Link>
           </div>
           <div className="space-y-5">
             {matches.map((match, i) => (
@@ -246,17 +267,19 @@ const RightSidebar = () => {
                 </Link>
                 <div className="flex gap-1">
                   <button className="flex-1 py-1.5 rounded-lg bg-indigo-600 text-white text-[10px] font-bold hover:bg-indigo-700 transition-colors">Request</button>
-                  <button className="px-2 rounded-lg border border-slate-100 text-slate-400 hover:bg-slate-50"><MessageSquare className="w-3 h-3" /></button>
+                  <Link to={`/messages/${match._id}`} className="px-2 rounded-lg border border-slate-100 text-slate-400 hover:bg-slate-50 flex items-center justify-center">
+                    <MessageSquare className="w-3 h-3" />
+                  </Link>
                 </div>
               </div>
             ))}
           </div>
         </div>
       ) : (
-        <ComingSoonBox title="Skill Matches" icon={Zap} color="orange" />
+        <PlaceholderWidget title="Skill Matches" link="/messages/exchangers" icon={Zap} color="orange" />
       )}
 
-      <ComingSoonBox title="Match Interests" icon={Users} color="rose" />
+      <PlaceholderWidget title="Match Interests" link="/messages/exchangers" icon={Users} color="rose" />
     </>
   );
 
@@ -275,7 +298,9 @@ const RightSidebar = () => {
             <Users className="w-4 h-4 text-indigo-600" />
             {user?.goal === 'Mentor' ? 'Mentor Community' : 'Suggested Mentors'}
           </h3>
-          <button className="text-xs font-bold text-indigo-600 hover:text-indigo-700 transition-colors">See all</button>
+          <Link to={user?.goal === 'Mentor' ? "/mentor-dashboard/overview" : "/learn/mentors"} className="text-xs font-bold text-indigo-600 hover:text-indigo-700 transition-colors">
+            See all
+          </Link>
         </div>
 
         <div className="space-y-4">
@@ -323,13 +348,20 @@ const RightSidebar = () => {
         <div className="bg-indigo-600 rounded-2xl p-6 text-white relative overflow-hidden shadow-lg shadow-indigo-100">
           <div className="relative z-10">
             <div className="flex items-center gap-2 mb-3">
-              <Star className="w-4 h-4 text-yellow-400 fill-yellow-400" />
+              <Flame className="w-4 h-4 text-yellow-400 fill-yellow-400" />
               <span className="text-[10px] font-black uppercase tracking-widest opacity-80">Weekly Goal</span>
             </div>
-            <h4 className="text-lg font-bold mb-1">4/5 Sessions</h4>
-            <p className="text-[11px] opacity-70 mb-4 font-medium">You're almost at your weekly learning goal. Finish one more session to earn a badge!</p>
+            <h4 className="text-lg font-bold mb-1">{weeklyProgress.completed}/{weeklyProgress.goal} Sessions</h4>
+            <p className="text-[11px] opacity-70 mb-4 font-medium">
+              {weeklyProgress.completed >= weeklyProgress.goal 
+                ? "Goal reached! Keep the streak going!" 
+                : `Finish ${weeklyProgress.goal - weeklyProgress.completed} more session${weeklyProgress.goal - weeklyProgress.completed > 1 ? 's' : ''} to earn a badge!`}
+            </p>
             <div className="w-full h-1.5 bg-white/20 rounded-full overflow-hidden">
-               <div className="w-[80%] h-full bg-white rounded-full"></div>
+               <div 
+                 className="h-full bg-white rounded-full transition-all duration-500" 
+                 style={{ width: `${Math.min((weeklyProgress.completed / weeklyProgress.goal) * 100, 100)}%` }}
+               ></div>
             </div>
           </div>
           <Zap className="absolute -bottom-4 -right-4 w-24 h-24 text-white/10 rotate-12" />

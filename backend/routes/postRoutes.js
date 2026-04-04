@@ -20,7 +20,8 @@ const {
   getReposts,
   getProfileStats,
   uploadPostImage,
-  getPostById
+  getPostById,
+  votePoll
 } = require('../controllers/postController');
 const { protect } = require('../middleware/auth');
 const upload = require('../middleware/upload');
@@ -52,5 +53,6 @@ router.put('/:id', protect, updatePost);
 router.delete('/:id', protect, deletePost);
 router.put('/:id/interested', protect, interestedPost);
 router.put('/:id/not-interested', protect, notInterestedPost);
+router.put('/:id/vote', protect, votePoll);
 
 module.exports = router;

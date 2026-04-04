@@ -31,6 +31,11 @@ passport.use(
             if (!user.avatarUrl && profile.photos && profile.photos.length > 0) {
               user.avatarUrl = profile.photos[0].value;
             }
+            // Sanitize invalid goal values from legacy data
+            const validGoals = ['Learn', 'Mentor', 'Exchange'];
+            if (user.goal && !validGoals.includes(user.goal)) {
+              user.goal = 'Learn';
+            }
             await user.save();
             return done(null, user);
           }

@@ -111,15 +111,68 @@ router.get('/stats/:mentorId', protect, async (req, res) => {
       breakdownPercent[i] = total > 0 ? Math.round((breakdown[i] / total) * 100) : 0;
     }
 
+    const respondedReviews = reviews.filter(r => r.mentorReply?.text);
+    const responseRate = total > 0 ? Math.round((respondedReviews.length / total) * 100) : 0;
+
+    const thisMonth = new Date();
+    thisMonth.setDate(1);
+    thisMonth.setMonth(thisMonth.getMonth() - 1);
+    const thisMonthReviews = reviews.filter(r => new Date(r.createdAt) >= thisMonth).length;
+
+    const lastMonth = new Date();
+    lastMonth.setDate(1);
+    lastMonth.setMonth(lastMonth.getMonth() - 2);
+    const lastMonthStart = new Date(lastMonth);
+    lastMonthStart.setMonth(lastMonthStart.getMonth() - 1);
+    const lastMonthReviews = reviews.filter(r => {
+      const d = new Date(r.createdAt);
+      return d >= lastMonthStart && d < thisMonth;
+    }).length;
+
+    const ratingTrend = lastMonthReviews > 0 && thisMonthReviews > 0
+      ? ((thisMonthReviews - lastMonthReviews) / lastMonthReviews * 100).toFixed(0)
+      : 0;
+
     res.json({
       averageRating: user?.mentorProfile?.rating || 0,
       totalReviews: total,
       breakdown,
-      breakdownPercent
+      breakdownPercent,
+      responseRate,
+      thisMonthReviews,
+      ratingTrend: Number(ratingTrend)
     });
   } catch (error) {
     console.error('Get Review Stats Error:', error);
     res.status(500).json({ message: 'Error fetching review stats' });
+  }
+});
+
+// @desc    Reply to a mentor review
+// @route   POST /api/reviews/:id/reply
+router.post('/:id/reply', protect, async (req, res) => {
+  try {
+    const { text } = req.body;
+    if (!text || !text.trim()) {
+      return res.status(400).json({ message: 'Reply text is required' });
+    }
+
+    const review = await Review.findById(req.params.id);
+    if (!review) {
+      return res.status(404).json({ message: 'Review not found' });
+    }
+
+    if (review.mentorId.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ message: 'Not authorized to reply to this review' });
+    }
+
+    review.mentorReply = { text: text.trim(), repliedAt: new Date() };
+    await review.save();
+
+    res.json(review);
+  } catch (error) {
+    console.error('Reply Error:', error);
+    res.status(500).json({ message: 'Error replying to review' });
   }
 });
 

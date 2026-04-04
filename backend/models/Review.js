@@ -23,6 +23,10 @@ const ReviewSchema = new mongoose.Schema({
     required: true
   },
   comment: String,
+  mentorReply: {
+    text: { type: String, trim: true },
+    repliedAt: Date
+  },
   createdAt: {
     type: Date,
     default: Date.now

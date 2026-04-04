@@ -32,11 +32,16 @@ const CourseSchema = new mongoose.Schema({
     description: String,
     duration: String,
     videoUrl: String,
+    videoPublicId: String,
+    videoDuration: Number,
     content: String,
-    order: Number,
-    completedBy: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }]
+    order: Number
   }],
   enrolledCount: {
+    type: Number,
+    default: 0
+  },
+  views: {
     type: Number,
     default: 0
   },
@@ -49,6 +54,7 @@ const CourseSchema = new mongoose.Schema({
     default: 0
   },
   tags: [String],
+  previewVideoUrl: String,
   createdAt: {
     type: Date,
     default: Date.now
@@ -63,6 +69,9 @@ CourseSchema.index({ mentorId: 1, status: 1 });
 CourseSchema.index({ category: 1 });
 CourseSchema.index({ tags: 1 });
 CourseSchema.index({ rating: -1 });
+CourseSchema.index({ status: 1, category: 1, level: 1, rating: -1 });
+CourseSchema.index({ status: 1, price: 1 });
+CourseSchema.index({ title: 'text', description: 'text', tags: 'text', category: 'text' }, { weights: { title: 10, tags: 5, category: 3, description: 1 } });
 
 module.exports = {
   Course: mongoose.model('Course', CourseSchema)

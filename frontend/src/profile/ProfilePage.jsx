@@ -117,10 +117,6 @@ const ProfilePage = () => {
   // Lazy-load feed when tab changes
   const loadFeed = useCallback(async (type) => {
     if (!user) return;
-    setFeeds(prev => {
-      if (prev[type].loaded) return prev;
-      return prev;
-    });
 
     const fetchers = {
       posts: () => postService.getUserPosts(user._id, 1),
@@ -171,7 +167,8 @@ const ProfilePage = () => {
 
     const handleNewPost = (newPost) => {
       // If it's my post, increment total and prepend to list
-      if (newPost.userId._id === user?._id || newPost.userId === user?._id) {
+      const postAuthorId = newPost.userId?._id || newPost.userId;
+      if (postAuthorId === user?._id) {
         setProfileStats(prev => ({ ...prev, postsCount: prev.postsCount + 1 }));
         setFeeds(prev => ({
           ...prev,

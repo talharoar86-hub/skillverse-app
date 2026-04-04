@@ -91,7 +91,13 @@ router.put('/profile', protect, async (req, res) => {
     if (skills) user.skills = skills;
     if (learningGoals) user.learningGoals = learningGoals;
     if (experienceLevel) user.experienceLevel = experienceLevel;
-    if (goal) user.goal = goal;
+    const validGoals = ['Learn', 'Mentor', 'Exchange'];
+    if (goal) {
+      if (!validGoals.includes(goal)) {
+        return res.status(400).json({ message: `Invalid goal value. Must be one of: ${validGoals.join(', ')}` });
+      }
+      user.goal = goal;
+    }
     if (availability) user.availability = availability;
     if (bio) user.bio = bio;
     if (avatarUrl) user.avatarUrl = avatarUrl;
